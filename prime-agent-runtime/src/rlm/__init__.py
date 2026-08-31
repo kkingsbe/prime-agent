@@ -181,6 +181,17 @@ async def delete_subagent(target: str | RLMSubagent) -> RLMSubagent:
     return _subagent_from_payload(payload.get("subagent"), "rlm.delete_subagent")
 
 
+async def yield_turn() -> dict[str, Any]:
+    """Ask the host to end the current turn after this cell completes.
+
+    Delegation is async: after spawning children with :func:`run`, call
+    ``await yield_turn()`` to end the turn immediately. No further tool calls
+    are processed this turn; the host re-enters the session when child results
+    (or follow-up instructions) arrive.
+    """
+    return await host_request("rlm.yield_turn")
+
+
 class _HarnessProxy:
     """Resolve the harness state against the current environment on every access.
 
@@ -246,6 +257,9 @@ class _RLMCallable:
     async def delete_subagent(self, target: str | RLMSubagent) -> RLMSubagent:
         return await delete_subagent(target)
 
+    async def yield_turn(self) -> dict[str, Any]:
+        return await yield_turn()
+
     async def __call__(self, prompt: str, **kwargs: Any) -> RLMSpawnHandle:
         return await run(prompt, **kwargs)
 
@@ -284,6 +298,7 @@ __all__ = [
     "list_subagents",
     "rlm",
     "run",
+    "yield_turn",
 ]
 
 # Lazily re-export the MCP base class. Kept lazy so `import rlm` never requires

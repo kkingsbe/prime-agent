@@ -1135,6 +1135,7 @@ export class AgentSession {
 	private _initialActiveToolNames?: string[];
 	private _allowedToolNames?: Set<string>;
 	private _includeGoals: boolean;
+	private _yieldRequested = false;
 	private _includeCompactSkill: boolean;
 	private _rlmHeartbeatController?: AgentRlmHeartbeatController;
 	private _agentMessageController?: AgentSessionMessageController;
@@ -9118,6 +9119,17 @@ export class AgentSession {
 					shellPath: this.settingsManager.getShellPath(),
 					onLateSentAgentMessage: (toolCallId, message) =>
 						this._recordLateIpythonSentAgentMessage(toolCallId, message),
+					// rlm.yield_turn() in a cell sets the flag; the ipython tool
+					// result reports terminate so the turn ends after this batch.
+					takeYieldRequest: () => {
+						const yielded = this._yieldRequested;
+						this._yieldRequested = false;
+						return yielded;
+					},
+				},
+				delegate: {
+					spawnChild: (task, name, model) =>
+						this.runRlmChild(task, { ...(name ? { name } : {}), ...(model ? { model } : {}) }),
 				},
 			});
 		}
@@ -9152,7 +9164,9 @@ export class AgentSession {
 		this._bindExtensionCore(this._extensionRunner);
 		this._applyExtensionBindings(this._extensionRunner);
 
-		const defaultActiveToolNames = this._baseToolsOverride ? Object.keys(this._baseToolsOverride) : ["ipython"];
+		const defaultActiveToolNames = this._baseToolsOverride
+			? Object.keys(this._baseToolsOverride)
+			: ["ipython", "delegate"];
 		const baseActiveToolNames = [...(options.activeToolNames ?? defaultActiveToolNames)];
 		if (this._goalState.status === "active" && this._includeGoals) {
 			// An active goal needs ipython so the model can reach the goal skill.
@@ -9212,6 +9226,10 @@ export class AgentSession {
 			"rlm.find_models": createRlmFindModelsHostHandler((query, limit) => this.findRlmModels(query, limit)),
 			"rlm.list_subagents": createRlmListSubagentsHostHandler(() => this.listRlmSubagents()),
 			"rlm.delete_subagent": createRlmDeleteSubagentHostHandler((target) => this.deleteRlmSubagent(target)),
+			"rlm.yield_turn": async () => {
+				this._yieldRequested = true;
+				return { yielded: true };
+			},
 			"model.info": async () => ({
 				id: this.model?.id ?? null,
 				provider: this.model?.provider ?? null,

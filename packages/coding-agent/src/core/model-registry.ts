@@ -738,7 +738,7 @@ export class ModelRegistry {
 					input: (modelDef.input ?? ["text"]) as ("text" | "image")[],
 					cost: modelDef.cost ?? defaultCost,
 					contextWindow: modelDef.contextWindow ?? 128000,
-					maxTokens: modelDef.maxTokens ?? 16384,
+					maxTokens: modelDef.maxTokens,
 					headers: undefined,
 					compat,
 				} as Model<Api>);

@@ -1,0 +1,1 @@
+- Added `rlm.yield_turn()` to end the current turn deterministically after delegation (kernel host request; the ipython tool result reports `terminate` so the turn closes without another model call).

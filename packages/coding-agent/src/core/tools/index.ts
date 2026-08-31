@@ -39,18 +39,21 @@ export {
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { ToolDefinition } from "../extensions/types.js";
+import { createDelegateToolDefinition, type DelegateToolOptions } from "./delegate.js";
 import { createIpythonToolDefinition, type IpythonToolOptions } from "./ipython.js";
 
 export type Tool = AgentTool<any>;
 export type ToolDef = ToolDefinition<any, any>;
-export type ToolName = "ipython";
+export type ToolName = "ipython" | "delegate";
 
 export interface ToolsOptions {
 	ipython?: IpythonToolOptions;
+	delegate?: DelegateToolOptions;
 }
 
 export function createAllToolDefinitions(cwd: string, options?: ToolsOptions): Record<ToolName, ToolDef> {
 	return {
 		ipython: createIpythonToolDefinition(cwd, options?.ipython),
+		delegate: createDelegateToolDefinition(options?.delegate),
 	};
 }

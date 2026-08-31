@@ -295,6 +295,12 @@ export interface IpythonToolOptions {
 	onLateSentAgentMessage?: (toolCallId: string, message: KernelSentAgentMessage) => void;
 	/** Shared provisioner owning the kernel lifecycle. When provided, the remaining options are ignored. */
 	provisioner?: IpythonKernelProvisioner;
+	/**
+	 * Read-and-reset hook for the yield flag set by rlm.yield_turn(). When it
+	 * returns true after a cell, this tool's result reports terminate so the
+	 * session loop ends the turn without another model call.
+	 */
+	takeYieldRequest?: () => boolean;
 }
 
 /**
@@ -682,6 +688,7 @@ export function createIpythonToolDefinition(
 						error: r.error,
 					},
 					isError: r.status === "error" || r.status === "aborted",
+					terminate: options?.takeYieldRequest?.() ?? false,
 				};
 			} finally {
 				if (hasWorkingMessage) {

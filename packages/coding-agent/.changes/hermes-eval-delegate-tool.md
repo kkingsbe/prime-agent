@@ -1,0 +1,1 @@
+- Added a `delegate` tool (OpenAI-handoff style) that spawns an RLM child from the tool schema and ends the turn automatically after the batch; multiple delegate calls in one message run children in parallel.
