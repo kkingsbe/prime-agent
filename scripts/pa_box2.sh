@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# pa_box2.sh — trial runner for the delegation A/B box (Phases 1-3, grep).
+# Usage:
+#   pa_box2.sh --ex grep --run A1 --design A --deadline 1200 [--components 1,2,7,8] [--solo]
+# Guarantees: spec-off assert, pristine test scoring, last-importable-state snapshot,
+# metrics v2 digest, archive to run-archive/.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+ROOT=$(pwd)
+POLY=/opt/data/repos/aider/tmp.benchmarks/polyglot-benchmark/python/exercises/practice
+SCORER=/opt/data/repos/aider/.venv-bench/bin/python
+ARCHIVE="$ROOT/run-archive"
+mkdir -p "$ARCHIVE" /tmp/pa-box2
+
+EX=""; RUN=""; DESIGN="ctrl"; DEADLINE=1200; COMPS=""; SOLO=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --ex) EX="$2"; shift 2;; --run) RUN="$2"; shift 2;; --design) DESIGN="$2"; shift 2;;
+    --deadline) DEADLINE="$2"; shift 2;; --components) COMPS="$2"; shift 2;;
+    --solo) SOLO=1; shift;; *) echo "unknown: $1"; exit 2;;
+  esac
+done
+: "${EX:?--ex required}" ; : "${RUN:?--run required}"
+SRC="$POLY/$EX"; [ -d "$SRC" ] || { echo "no exercise $SRC"; exit 1; }
+
+# 0. rig assert (fail fast)
+bash "$ROOT/scripts/pa_rigctl.sh" assert || { echo "[box2] RIG ASSERT FAILED — aborting"; exit 3; }
+echo "[box2] $RUN | ex=$EX design=$DESIGN deadline=${DEADLINE}s comps=[$COMPS] solo=$SOLO | $(date -u +%H:%M:%SZ)"
+
+# 1. workdir from PRISTINE source
+TS=$(date +%Y%m%d-%H%M%S); WD="/tmp/pa-box2/$TS-$RUN"; mkdir -p "$WD"
+cp -r "$SRC"/. "$WD/"
+[ -f "$SRC/forth.py" ] && cp "$SRC/forth.py" "$WD/forth.py"
+SOLFILE="$WD/$EX.py"
+cp "$SOLFILE" "$WD/snap-000-start.py"
+
+# 2. protocol + prompt per design (solo arm: no protocol at all)
+PB=""; PROMPT=""
+if [ "$SOLO" -eq 1 ]; then
+  PROMPT="Work on the '$EX' exercise in this directory: read .docs/instructions.md and the test file, implement $EX.py, and make the tests pass."
+else
+  case "$DESIGN" in
+  ctrl)
+    PB="$ROOT/scripts/pa-playbook/PB_SHORT_v2.md"
+    PROMPT="Work on the '$EX' exercise in this directory. READ AND FOLLOW THE PROTOCOL FILE AT $WD/PB_SHORT_v2.md — MANDATORY. Improve the solution and make the tests pass." ;;
+  A)
+    PB="$ROOT/scripts/pa-playbook/PB_v3_A.md"
+    PROMPT="Work on the '$EX' exercise in this directory. READ AND FOLLOW THE PROTOCOL FILE AT $WD/PB_v3_A.md — MANDATORY. FIRST write PLAN.md (>=3 numbered tasks: ##T1: desc | dep: none). THEN delegate one child per task. Your turn ends after delegating; you will be re-entered to integrate." ;;
+  B|D)
+    PB="$ROOT/scripts/pa-playbook/PB_v3_$DESIGN.md"
+    PROMPT="Work on the '$EX' exercise in this directory. READ AND FOLLOW THE PROTOCOL FILE AT $WD/PB_v3_$DESIGN.md — MANDATORY. Make the tests pass." ;;
+  *) echo "unknown design $DESIGN"; exit 2 ;;
+  esac
+fi
+[ -f "$PB" ] && cp "$PB" "$WD/" || { echo "[box2] protocol missing: $PB"; exit 1; }
+
+# 3. follow-up components -> PA_FOLLOWUP_EXTRA
+EXTRA=""
+add() { EXTRA="${EXTRA}${EXTRA:+$'\n\n'}$1"; }
+if [ "$SOLO" -eq 0 ]; then
+  add "Run tests IN-KERNEL (import pytest; pytest.main([...])). NEVER via subprocess. Do NOT inspect subagent session directories."
+  case ",$COMPS," in
+    *,1,*) add "First write ONE LINE: what failed and why. Then fix it." ;;
+  esac
+  case ",$COMPS," in
+    *,2,*) add "PLAN reminder: re-state your remaining tasks and delegate/finish them now." ;;
+  esac
+  case ",$COMPS," in
+    *,12,*) add "PATCH the draft's files in place; do NOT rewrite from scratch." ;;
+  esac
+fi
+export PA_FOLLOWUP_EXTRA="$EXTRA"
+
+# 4. run (foreground; deadline+buffer) with periodic solution-file snapshots
+echo "[box2] following entries -> $WD/run.log"
+cd "$ROOT" && timeout $((DEADLINE + 90)) python3 scripts/pa_rpc.py \
+  --workdir "$WD" --model LiquidAI/LFM2.5-2.6B-GGUF --prompt "$PROMPT" \
+  --deadline "$DEADLINE" > "$WD/run.log" 2>&1 &
+RPC_PID=$!
+( while kill -0 "$RPC_PID" 2>/dev/null; do
+    cp "$SOLFILE" "$WD/snap-$(date +%s).py" 2>/dev/null
+    sleep 30
+  done ) &
+SNAP_PID=$!
+wait "$RPC_PID"; RC=$?
+kill "$SNAP_PID" 2>/dev/null
+cp "$SOLFILE" "$WD/snap-$(date +%s)-final.py" 2>/dev/null
+grep --line-buffered -E "\[rpc\]" "$WD/run.log" | tail -25
+echo "[box2] rpc exit=$RC"
+
+# 5. snapshot walk + score (last importable state, pristine tests)
+cp "$SRC/${EX}_test.py" "$WD/${EX}_test.py"   # pristine restore
+last_good=""
+for f in $(ls -t "$WD"/snap-*.py 2>/dev/null); do
+  if (cd "$WD" && $SCORER -c "import $EX" 2>/dev/null); then last_good="$f"; break; fi
+done
+if [ -n "$last_good" ] && [ "$last_good" != "$SOLFILE" ]; then
+  cp "$last_good" "$SOLFILE" && echo "[box2] scored last-importable state: $(basename "$last_good")"
+else
+  echo "[box2] scored final file state (importable or deferred to score)"
+fi
+( cd "$WD" && $SCORER -m pytest "${EX}_test.py" -q 2>&1 | tail -3 ) | tee "$WD/score.txt"
+
+# 6. metrics v2
+python3 scripts/pa_metrics.py "$WD/rpc.jsonl" 2>/dev/null | tee "$WD/metrics.txt" | grep -E "delegates|spawns|child_|clean_exit|error_flags|score|plan_tasks"
+
+# 7. archive
+DST="$ARCHIVE/$TS-$RUN"; mv "$WD" "$DST"
+echo "[box2] DONE -> $DST | score: $(head -1 "$DST/score.txt")"

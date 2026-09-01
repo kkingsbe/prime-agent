@@ -37,6 +37,12 @@ victory_claim = False          # final text asserts success
 child_aborted = 0              # children whose last stopReason == aborted
 child_natural_stop = 0         # children whose last message stopReason == stop
 child_cells_scan = {}          # cid -> {stops:[], last_stop, has_text} from session files
+# v2 (2026-09-01): delegate-tool counting + error taxonomy flags
+delegate_calls = 0             # individual delegate tool calls (root, all messages)
+delegate_batches = 0           # messages containing >=1 delegate call (parallel batch)
+spec_error = False             # b10687 speculative-batch error seen in root trace
+model_404 = False              # "model downloaded but not loaded" seen in root trace
+plan_tasks = 0                 # filled externally by pa_plan.py / runner (plan file)
 
 POLL_MARKERS = ("time.sleep", "sleep(", "while True")
 VICTORY_MARKERS = ("all tests pass", "tests passed", "all pass", "complete and all tests", "passed all")
@@ -53,6 +59,7 @@ with open(RUN) as f:
             msg = ev.get("message", {})
             if msg.get("role") == "assistant":
                 turn_index += 1
+                msg_had_delegate = False
                 for c in msg.get("content", []):
                     if not isinstance(c, dict):
                         continue
@@ -69,14 +76,23 @@ with open(RUN) as f:
                                 yield_fused = True
                         if any(p in code for p in POLL_MARKERS):
                             poll_turns += 1
+                    if c.get("type") == "toolCall" and c.get("name") == "delegate":
+                        delegate_calls += 1
+                        msg_had_delegate = True
                     if c.get("type") == "text" and c.get("text"):
                         final_text = c["text"]
+                if msg_had_delegate:
+                    delegate_batches += 1
                 sr = msg.get("stopReason")
                 if sr:
                     stop_reasons.append(sr)
                 joined = json.dumps(msg)
                 if "Context size has been exceeded" in joined:
                     ctx_overflow_root += 1
+                if "speculative batch index" in joined or "is not inside the current sub-batch" in joined:
+                    spec_error = True
+                if "model downloaded but not loaded" in joined or "not loaded" in joined and "model" in joined:
+                    model_404 = True
         elif t == "agent_end":
             agent_ends += 1
             if first_agent_end_turn is None:
@@ -160,8 +176,10 @@ child_work_ratio = (child_turns / root_tool_turns) if root_tool_turns else 0.0
 turns_before_spawn = (first_rlm_turn - 1) if first_rlm_turn is not None else None
 
 print(f"=== metrics: {RUN} ===")
-print(f"lines            : {n_lines}")
+print(f"line  : {n_lines}")
 print(f"spawns           : {spawns}  (rlm code turns: {rlm_code_turns})")
+print(f"delegates        : {delegate_calls} calls in {delegate_batches} batch(es) (tool-call name=delegate)")
+print(f"plan_tasks       : {plan_tasks} (PLAN.md, runner-provided)")
 for cid, ch in children.items():
     last_stop = child_cells_scan.get(cid, {}).get("last_stop")
     print(
@@ -181,6 +199,7 @@ print(f"bubble_up        : {'YES' if bubble_up else 'NO'}  "
 print(f"ctx_overflow     : {ctx_overflow_root} (root trace)")
 print(f"clean_exit       : {'YES' if clean_exit else 'NO'}  "
       f"(agent_end={agent_ends}, last stop={stop_reasons[-1] if stop_reasons else None})")
+print(f"error_flags      : spec_error={'YES' if spec_error else 'no'}  model_404={'YES' if model_404 else 'no'}")
 print(f"zero_effort      : {'YES' if zero_effort else 'NO'}")
 print(f"root_tool_turns  : {root_tool_turns}  (poll_turn_ratio={poll_ratio:.2f}, polls={poll_turns})")
 print(f"spawn_cells      : {spawn_cells}  (target 1) | yield_fused: {'YES' if yield_fused else 'NO'} | turns_before_spawn: {turns_before_spawn}")

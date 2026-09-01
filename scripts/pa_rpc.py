@@ -195,17 +195,22 @@ def main():
                     and not integrate_sent
                 ):
                     integrate_sent = True
+                    base = (
+                        "All subagents have finished. INTEGRATE now: read what they "
+                        "produced (files + reports), apply/fix the solution in the "
+                        "exercise files, run the test suite yourself, and give the "
+                        "final answer once the tests pass."
+                    )
+                    extra = os.environ.get("PA_FOLLOWUP_EXTRA", "").strip()
+                    if extra:
+                        base += "\n\n" + extra
                     send({
                         "type": "follow_up",
-                        "message": (
-                            "All subagents have finished. INTEGRATE now: read what they "
-                            "produced (files + reports), apply/fix the solution in the "
-                            "exercise files, run the test suite yourself, and give the "
-                            "final answer once the tests pass."
-                        ),
+                        "message": base,
                         "id": "req-integrate",
                     })
-                    print("[rpc] all children terminal; sent integration follow_up", flush=True)
+                    print("[rpc] all children terminal; sent integration follow_up"
+                          + (" (+PA_FOLLOWUP_EXTRA)" if extra else ""), flush=True)
         return False
 
     done = False
