@@ -12,6 +12,10 @@
 3. APPEND to EVERY child task, VERBATIM:
    "WRITE your deliverable to <ABS_WORKDIR>/grep.py — open('<ABS_WORKDIR>/grep.py', 'w').write(<code>) — then READ THE FILE BACK. No stubs. Imports (import X) go at the VERY TOP — never inside strings/docstrings. After writing, VERIFY it parses: import ast; ast.parse(open('<ABS_WORKDIR>/grep.py').read()) — fix before finishing."
 
+CONTRACT (root MUST include in every child task): "The tests import `grep(pattern, flags,
+files) -> list[str]` from grep.py — implement THAT function exactly. Keep its signature.
+Do NOT build a CLI, no __main__, no argparse."
+
 4. END YOUR TURN right after delegating.
 
 5. On re-entry: INTEGRATE the children's files (patch in place, never rewrite

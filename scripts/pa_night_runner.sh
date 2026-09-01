@@ -19,10 +19,14 @@ if [ "${PA_GUARD_OFF:-0}" != "1" ] && [ "$UTC_HM" -ge 1200 ]; then
   exit 0
 fi
 
-# 1. in-progress guard — atomic lockfile (flock), serializes concurrent invocations
+# 1. in-progress guard — atomic lockfile (flock), serializes concurrent invocations.
+#    Retry a few seconds on teardown races; children must not inherit the fd.
 exec 9>"$ARCH/BOX_LOCK" || exit 0
-flock -n 9 || { echo "[night] another runner holds the lock — skipping this tick"; exit 0; }
-echo "$$" >&9
+for _try in 1 2 3 4 5; do
+  flock -n 9 && break
+  sleep 2
+  [ $_try -eq 5 ] && { echo "[night] lock held elsewhere — skipping this tick"; exit 0; }
+done
 
 # 2. progress init + pick next trial (pending/failed = actionable)
 if [ ! -f "$PROG" ]; then

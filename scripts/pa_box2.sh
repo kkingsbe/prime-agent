@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # pa_box2.sh — trial runner for the delegation A/B box (Phases 1-3, grep).
 # Usage:
-#   pa_box2.sh --ex grep --run A1 --design A --deadline 1200 [--components 1,2,7,8] [--solo]
+#   pa_box2.sh --ex grep --run A1 --design A --deadline 1200 [--components 1,2,7,8,12] [--solo]
 # Guarantees: spec-off assert, pristine test scoring, last-importable-state snapshot,
 # metrics v2 digest, archive to run-archive/.
 set -uo pipefail
+exec 9>&- 2>/dev/null   # child: release the night-runner's flock fd (no inheritance)
 cd "$(dirname "$0")/.." || exit 1
 ROOT=$(pwd)
 POLY=/opt/data/repos/aider/tmp.benchmarks/polyglot-benchmark/python/exercises/practice
