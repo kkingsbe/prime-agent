@@ -12,8 +12,8 @@ ORDER='["TR-00","TR-01","TR-02","TR-03","TR-04"]'
 UTC_HM=$(date -u +%H%M)
 echo "== pa_night_runner $(date -u +%Y-%m-%dT%H:%M:%SZ) =="
 
-# 0. 08:00 ET (=12:00 UTC) stop guard: final wrap-up only
-if [ "$UTC_HM" -ge 1200 ]; then
+# 0. 08:00 ET (=12:00 UTC) stop guard — SKIP when PA_GUARD_OFF=1 (daytime relay)
+if [ "${PA_GUARD_OFF:-0}" != "1" ] && [ "$UTC_HM" -ge 1200 ]; then
   echo "[night] 8am ET reached — trials complete. Final ledger:"
   python3 -c "import json; d=json.load(open('$ARCH/BOX_LEDGER.json')) if __import__('os').path.exists('$ARCH/BOX_LEDGER.json') else []; [print(' ', r['trial'], r['status'], r['score']) for r in d]" 2>/dev/null || echo "  (no ledger)"
   exit 0
