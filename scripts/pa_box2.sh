@@ -57,8 +57,8 @@ fi
 # inject the real workdir path into the protocol's ABS_WORKDIR placeholder so the
 # root's child-task suffix carries a concrete absolute path (children run in their
 # own session dirs; only an absolute path reaches the scored box file)
-if grep -q '<ABS_WORKDIR>' "$WD"/*.md 2>/dev/null; then
-  sed -i "s|<ABS_WORKDIR>|$WD|g" "$WD"/*.md
+if grep -q '<ABS_WORKDIR>\|<SLUG>' "$WD"/*.md 2>/dev/null; then
+  sed -i -e "s|<ABS_WORKDIR>|$WD|g" -e "s|<SLUG>|$EX|g" "$WD"/*.md
 fi
 
 # 3. follow-up components -> PA_FOLLOWUP_EXTRA

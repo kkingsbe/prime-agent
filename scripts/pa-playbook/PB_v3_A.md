@@ -12,11 +12,12 @@
    failure details (never re-send the identical task text).
 
 3. APPEND to EVERY child task, VERBATIM:
-   "WRITE your deliverable to <ABS_WORKDIR>/grep.py — open('<ABS_WORKDIR>/grep.py', 'w').write(<code>) — then READ THE FILE BACK. No stubs. Imports (import X) go at the VERY TOP — never inside strings/docstrings. After writing, VERIFY it parses: import ast; ast.parse(open('<ABS_WORKDIR>/grep.py').read()) — fix before finishing."
+   "WRITE your deliverable to <ABS_WORKDIR>/<SLUG>.py — open('<ABS_WORKDIR>/<SLUG>.py', 'w').write(<code>) — then READ THE FILE BACK. No stubs. Imports (import X) go at the VERY TOP — never inside strings/docstrings. After writing, VERIFY it parses: import ast; ast.parse(open('<ABS_WORKDIR>/<SLUG>.py').read()) — fix before finishing."
 
-CONTRACT (root MUST include in every child task): "The tests import `grep(pattern, flags,
-files) -> list[str]` from grep.py — implement THAT function exactly. Keep its signature.
-Do NOT build a CLI, no __main__, no argparse."
+CONTRACT (root MUST include in every child task): "The tests `from <SLUG> import ...` — implement
+the function(s) the tests import, with the EXACT signatures and return types described in
+.docs/instructions.md. Match their behavior precisely. NEVER build a CLI, no __main__, no
+argparse, no sys.argv, no stdin reads."
 
 4. END YOUR TURN right after delegating.
 
