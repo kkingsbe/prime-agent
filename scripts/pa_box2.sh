@@ -13,12 +13,13 @@ SCORER=/opt/data/repos/aider/.venv-bench/bin/python
 ARCHIVE="$ROOT/run-archive"
 mkdir -p "$ARCHIVE" /tmp/pa-box2
 
-EX=""; RUN=""; DESIGN="ctrl"; DEADLINE=1200; COMPS=""; SOLO=0
+EX=""; RUN=""; DESIGN="ctrl"; DEADLINE=1200; COMPS=""; SOLO=0; CONTRACT=0; EVAL=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --ex) EX="$2"; shift 2;; --run) RUN="$2"; shift 2;; --design) DESIGN="$2"; shift 2;;
     --deadline) DEADLINE="$2"; shift 2;; --components) COMPS="$2"; shift 2;;
-    --solo) SOLO=1; shift;; *) echo "unknown: $1"; exit 2;;
+    --solo) SOLO=1; shift;; --contract) CONTRACT=1; shift;; --eval) EVAL=1; shift;;
+    *) echo "unknown: $1"; exit 2;;
   esac
 done
 : "${EX:?--ex required}" ; : "${RUN:?--run required}"
@@ -39,7 +40,8 @@ cp "$SOLFILE" "$WD/snap-000-start.py"
 # 2. protocol + prompt per design (solo arm: no protocol at all)
 PB=""; PROMPT=""
 if [ "$SOLO" -eq 1 ]; then
-  PROMPT="Work on the '$EX' exercise in this directory: read .docs/instructions.md and the test file, implement $SLUG.py, and make the tests pass."
+  PB="$ROOT/scripts/pa-playbook/PB_SOLO.md"
+  PROMPT="Work on the '$EX' exercise in this directory. READ AND FOLLOW THE PROTOCOL FILE AT $WD/PB_SOLO.md — MANDATORY. Implement $SLUG.py yourself (delegation DISABLED — never use the delegate tool) and make the tests pass."
 else
   case "$DESIGN" in
   ctrl)
@@ -61,6 +63,18 @@ fi
 if grep -q '<ABS_WORKDIR>\|<SLUG>' "$WD"/*.md 2>/dev/null; then
   sed -i -e "s|<ABS_WORKDIR>|$WD|g" -e "s|<SLUG>|$SLUG|g" "$WD"/*.md
 fi
+
+# Q2: driver-side contract extraction (deterministic, ast-based) -> CONTRACT.md + prompt ref
+if [ "$CONTRACT" -eq 1 ]; then
+  if python3 "$ROOT/scripts/pa_contract.py" "$SRC/${SLUG}_test.py" "$SLUG" > "$WD/CONTRACT.md" 2>/dev/null; then
+    PROMPT="$PROMPT
+IMPORTANT: read '$WD/CONTRACT.md' BEFORE planning — it lists the EXACT imports and call shapes the tests use. Implement against it."
+  else
+    echo "[box2] contract extraction failed — continuing without CONTRACT.md"
+  fi
+fi
+# Q3: driver-side evaluator — pytest output injected at integration re-entry
+[ "$EVAL" -eq 1 ] && export PA_EVAL_TEST="$SRC/${SLUG}_test.py"
 
 # 3. follow-up components -> PA_FOLLOWUP_EXTRA
 EXTRA=""

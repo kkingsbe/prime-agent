@@ -52,6 +52,37 @@ TERMINAL_CHILD_STATUSES = {"done", "cancelled", "error"}
 PLAN_RE = re.compile(r"^##\s*T\d+\s*[:.\-]?", re.I | re.M)
 
 
+# ---- driver-side evaluator (Q3): pytest output injected at integration re-entry ----
+def _eval_feedback(workdir: str, test_src: str) -> str:
+    import subprocess
+    try:
+        py = os.environ.get("PA_EVAL_PY", "/opt/data/repos/aider/.venv-bench/bin/python")
+        tname = os.path.basename(test_src)
+        with open(os.path.join(workdir, tname), "w", encoding="utf-8") as f:
+            f.write(open(test_src, encoding="utf-8").read())  # pristine restore
+        p = subprocess.run(
+            [py, "-m", "pytest", tname, "-q"], cwd=workdir,
+            capture_output=True, text=True, timeout=60,
+        )
+        lines = ((p.stdout or "") + (p.stderr or "")).splitlines()
+        fails = [l for l in lines if l.startswith("FAILED") or l.startswith("ERROR")]
+        detail = []
+        for l in lines:
+            if ("assert" in l or "Error" in l or "==" in l) and l.strip():
+                detail.append(l.strip()[:160])
+                if len(detail) >= 4:
+                    break
+        head = [l for l in lines[:3] if l.strip()]
+        msg = f"PYTEST FEEDBACK ({len(fails)} failing/error tests):\n" + "\n".join(head)
+        if fails:
+            msg += "\nFailing tests:\n" + "\n".join(fails[:12])
+        if detail:
+            msg += "\nDetail:\n" + "\n".join(detail[:4])
+        return msg[:1800]
+    except Exception as e:  # eval must never block the re-entry
+        return f"PYTEST FEEDBACK unavailable: {e}"
+
+
 def _plan_tasks_ok(workdir: str) -> bool:
     try:
         text = open(os.path.join(workdir, "PLAN.md"), encoding="utf-8").read()
@@ -236,6 +267,9 @@ def main():
                     extra = os.environ.get("PA_FOLLOWUP_EXTRA", "").strip()
                     if extra:
                         base += "\n\n" + extra
+                    eval_src = os.environ.get("PA_EVAL_TEST", "").strip()
+                    if eval_src:
+                        base += "\n\n" + _eval_feedback(args.workdir, eval_src)
                     send({
                         "type": "follow_up",
                         "message": base,
