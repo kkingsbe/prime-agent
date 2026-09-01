@@ -63,7 +63,7 @@ if [ "$SOLO" -eq 0 ]; then
     *,1,*) add "First write ONE LINE: what failed and why. Then fix it." ;;
   esac
   case ",$COMPS," in
-    *,2,*) add "PLAN reminder: re-state your remaining tasks and delegate/finish them now." ;;
+    *,2,*) add "PLAN reminder: finish remaining tasks now — do NOT re-delegate work already delegated." ;;
   esac
   case ",$COMPS," in
     *,12,*) add "PATCH the draft's files in place; do NOT rewrite from scratch." ;;
