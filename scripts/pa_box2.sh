@@ -57,8 +57,8 @@ fi
 # inject the real workdir path into the protocol's ABS_WORKDIR placeholder so the
 # root's child-task suffix carries a concrete absolute path (children run in their
 # own session dirs; only an absolute path reaches the scored box file)
-if [ -f "$WD/PB_v3_A.md" ] && grep -q '<ABS_WORKDIR>' "$WD/PB_v3_A.md" 2>/dev/null; then
-  sed -i "s|<ABS_WORKDIR>|$WD|g" "$WD/PB_v3_A.md"
+if grep -q '<ABS_WORKDIR>' "$WD"/*.md 2>/dev/null; then
+  sed -i "s|<ABS_WORKDIR>|$WD|g" "$WD"/*.md
 fi
 
 # 3. follow-up components -> PA_FOLLOWUP_EXTRA
@@ -75,6 +75,7 @@ if [ "$SOLO" -eq 0 ]; then
   case ",$COMPS," in
     *,12,*) add "PATCH the draft's files in place; do NOT rewrite from scratch." ;;
   esac
+  add "FINALIZE when the remaining failures are understood: leave the last file state importable and END your turn with a one-line summary. Re-check REFLECTIONS.md before deciding what to try next."
 fi
 export PA_FOLLOWUP_EXTRA="$EXTRA"
 
