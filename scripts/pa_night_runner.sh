@@ -19,11 +19,10 @@ if [ "$UTC_HM" -ge 1200 ]; then
   exit 0
 fi
 
-# 1. in-progress guard — never overlap runs
-if pgrep -f "pa_rpc.py|pa_box2.sh" >/dev/null 2>&1; then
-  cur=$(ls -t "$ARCH" 2>/dev/null | head -1)
-  echo "[night] trial in progress ($cur) — skipping this tick"; exit 0
-fi
+# 1. in-progress guard — atomic lockfile (flock), serializes concurrent invocations
+exec 9>"$ARCH/BOX_LOCK" || exit 0
+flock -n 9 || { echo "[night] another runner holds the lock — skipping this tick"; exit 0; }
+echo "$$" >&9
 
 # 2. progress init + pick next trial (pending/failed = actionable)
 if [ ! -f "$PROG" ]; then
