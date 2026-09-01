@@ -99,12 +99,15 @@ echo "[box2] rpc exit=$RC"
 cp "$SRC/${EX}_test.py" "$WD/${EX}_test.py"   # pristine restore
 last_good=""
 for f in $(ls -t "$WD"/snap-*.py 2>/dev/null); do
-  if (cd "$WD" && $SCORER -c "import $EX" 2>/dev/null); then last_good="$f"; break; fi
+  # test the SNAPSHOT FILE itself (ast.parse), not the live workdir file
+  if $SCORER -c "import ast; ast.parse(open(r'$f').read())" 2>/dev/null; then
+    last_good="$f"; break
+  fi
 done
 if [ -n "$last_good" ] && [ "$last_good" != "$SOLFILE" ]; then
   cp "$last_good" "$SOLFILE" && echo "[box2] scored last-importable state: $(basename "$last_good")"
 else
-  echo "[box2] scored final file state (importable or deferred to score)"
+  echo "[box2] no parseable snapshot (${last_good:-none}); scoring final file state"
 fi
 ( cd "$WD" && $SCORER -m pytest "${EX}_test.py" -q 2>&1 | tail -3 ) | tee "$WD/score.txt"
 

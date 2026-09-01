@@ -10,7 +10,7 @@
    One delegate call per child. Sequential, never parallel.
 
 3. APPEND to EVERY child task, VERBATIM:
-   "WRITE your deliverable to <ABS_WORKDIR>/grep.py — open('<ABS_WORKDIR>/grep.py', 'w').write(<code>) — then READ THE FILE BACK. No stubs."
+   "WRITE your deliverable to <ABS_WORKDIR>/grep.py — open('<ABS_WORKDIR>/grep.py', 'w').write(<code>) — then READ THE FILE BACK. No stubs. Imports (import X) go at the VERY TOP — never inside strings/docstrings. After writing, VERIFY it parses: import ast; ast.parse(open('<ABS_WORKDIR>/grep.py').read()) — fix before finishing."
 
 4. END YOUR TURN right after delegating.
 
