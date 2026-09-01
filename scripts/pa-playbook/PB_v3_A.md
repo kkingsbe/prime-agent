@@ -21,4 +21,9 @@ Work in this order:
 Children are LEAF workers: each child WRITES its deliverable file in the workdir
 (no stubs, no `pass`), does NOT delegate further, and reports the file path when done.
 
+TASK SUFFIX (root MUST append to EVERY delegate task): "Write your deliverable to
+`grep.py` in the workdir using an ABSOLUTE path — `open('<abs workdir>/grep.py',
+'w').write(<code>)` — and READ IT BACK to verify. NEVER keep the implementation only
+in the kernel."
+
 NEVER modify the test file. Each child owns only its assigned task file.
