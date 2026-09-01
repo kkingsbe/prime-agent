@@ -23,6 +23,7 @@ while [ $# -gt 0 ]; do
 done
 : "${EX:?--ex required}" ; : "${RUN:?--run required}"
 SRC="$POLY/$EX"; [ -d "$SRC" ] || { echo "no exercise $SRC"; exit 1; }
+SLUG=$(echo "$EX" | tr - _)   # dir name -> module file slug (phone-number -> phone_number)
 
 # 0. rig assert (fail fast)
 bash "$ROOT/scripts/pa_rigctl.sh" assert || { echo "[box2] RIG ASSERT FAILED — aborting"; exit 3; }
@@ -32,13 +33,13 @@ echo "[box2] $RUN | ex=$EX design=$DESIGN deadline=${DEADLINE}s comps=[$COMPS] s
 TS=$(date +%Y%m%d-%H%M%S); WD="/tmp/pa-box2/$TS-$RUN"; mkdir -p "$WD"
 cp -r "$SRC"/. "$WD/"
 [ -f "$SRC/forth.py" ] && cp "$SRC/forth.py" "$WD/forth.py"
-SOLFILE="$WD/$EX.py"
+SOLFILE="$WD/$SLUG.py"
 cp "$SOLFILE" "$WD/snap-000-start.py"
 
 # 2. protocol + prompt per design (solo arm: no protocol at all)
 PB=""; PROMPT=""
 if [ "$SOLO" -eq 1 ]; then
-  PROMPT="Work on the '$EX' exercise in this directory: read .docs/instructions.md and the test file, implement $EX.py, and make the tests pass."
+  PROMPT="Work on the '$EX' exercise in this directory: read .docs/instructions.md and the test file, implement $SLUG.py, and make the tests pass."
 else
   case "$DESIGN" in
   ctrl)
@@ -58,7 +59,7 @@ fi
 # root's child-task suffix carries a concrete absolute path (children run in their
 # own session dirs; only an absolute path reaches the scored box file)
 if grep -q '<ABS_WORKDIR>\|<SLUG>' "$WD"/*.md 2>/dev/null; then
-  sed -i -e "s|<ABS_WORKDIR>|$WD|g" -e "s|<SLUG>|$EX|g" "$WD"/*.md
+  sed -i -e "s|<ABS_WORKDIR>|$WD|g" -e "s|<SLUG>|$SLUG|g" "$WD"/*.md
 fi
 
 # 3. follow-up components -> PA_FOLLOWUP_EXTRA
@@ -98,7 +99,7 @@ grep --line-buffered -E "\[rpc\]" "$WD/run.log" | tail -25
 echo "[box2] rpc exit=$RC"
 
 # 5. snapshot walk + score (last importable state, pristine tests)
-cp "$SRC/${EX}_test.py" "$WD/${EX}_test.py"   # pristine restore
+cp "$SRC/${SLUG}_test.py" "$WD/${SLUG}_test.py"   # pristine restore
 last_good=""
 for f in $(ls -t "$WD"/snap-*.py 2>/dev/null); do
   # test the SNAPSHOT FILE itself (ast.parse), not the live workdir file
@@ -111,7 +112,7 @@ if [ -n "$last_good" ] && [ "$last_good" != "$SOLFILE" ]; then
 else
   echo "[box2] no parseable snapshot (${last_good:-none}); scoring final file state"
 fi
-( cd "$WD" && $SCORER -m pytest "${EX}_test.py" -q 2>&1 | tail -3 ) | tee "$WD/score.txt"
+( cd "$WD" && $SCORER -m pytest "${SLUG}_test.py" -q 2>&1 | tail -3 ) | tee "$WD/score.txt"
 
 # 6. metrics v2
 python3 scripts/pa_metrics.py "$WD/rpc.jsonl" 2>/dev/null | tee "$WD/metrics.txt" | grep -E "delegates|spawns|child_|clean_exit|error_flags|score|plan_tasks"
