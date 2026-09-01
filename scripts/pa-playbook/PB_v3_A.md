@@ -18,4 +18,7 @@ Work in this order:
    (patch their work, do not rewrite from scratch), run tests IN-KERNEL
    (`import pytest; pytest.main([...])`), fix until the tests pass.
 
+Children are LEAF workers: each child WRITES its deliverable file in the workdir
+(no stubs, no `pass`), does NOT delegate further, and reports the file path when done.
+
 NEVER modify the test file. Each child owns only its assigned task file.

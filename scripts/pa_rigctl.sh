@@ -15,7 +15,7 @@ case "${1:-status}" in
   status) status | python3 -c "import json,sys; d=json.load(sys.stdin); print('model:', d.get('active_model') or d.get('model_path'), '| spec:', d.get('speculative_type'), '| drafter:', d.get('spec_drafter_kind'), '| ctx:', d.get('context_length'), '| parallel:', d.get('parallel_slots') or d.get('n_parallel'))" ;;
   load)   curl -s -m 180 -X POST "$RIG/v1/load" -H "Authorization: Bearer $KEY" \
             -H "Content-Type: application/json" \
-            -d "{\"model_path\":\"$MODEL\",\"gguf_variant\":\"$VARIANT\",\"force_cancel_active\":true,\"max_seq_length\":131072,\"n_parallel\":2,\"speculative_type\":\"off\"}" >/dev/null && echo "load issued" ;;
+            -d "{\"model_path\":\"$MODEL\",\"gguf_variant\":\"$VARIANT\",\"force_cancel_active\":true,\"max_seq_length\":131072,\"n_parallel\":${PARALLEL:-4},\"speculative_type\":\"off\"}" >/dev/null && echo "load issued" ;;
   assert) status | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
