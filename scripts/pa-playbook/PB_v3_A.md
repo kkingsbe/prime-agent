@@ -1,29 +1,22 @@
-# Protocol A (PLAN-LIST) — MANDATORY
+# PROTOCOL A (PLAN-LIST) — MANDATORY. Do exactly this, in this order.
 
-Work in this order:
+1. WRITE PLAN.md NOW, yourself, exactly 3 lines:
+   ##T1: <work item> | dep: none
+   ##T2: <work item> | dep: T1
+   ##T3: <work item> | dep: T2
+   Writing the plan is YOUR job. Never delegate it.
 
-1. READ the exercise docs (`.docs/instructions.md`) and the test file.
-2. WRITE `PLAN.md` in this directory NOW, BEFORE any delegate call: at least 3
-   numbered tasks, one per line:
-   ##T1: <first work item> | dep: none
-   ##T2: <second work item> | dep: T1
-   ##T3: <third work item> | dep: T1
-   Each task must be a DIFFERENT work item. List dependencies after |.
-3. DELEGATE one child per task — one `delegate` tool call per task, SEQUENTIAL
-   (never parallel). Name each child after its task (T1, T2, T3). Give the child
-   its task text verbatim. Use ONLY the delegate tool: NEVER rlm(), NEVER spawn,
-   NEVER parallel children, NEVER work the tasks yourself.
-4. END YOUR TURN after delegating. Do NOT work on the tasks yourself.
-5. Your turn resumes when children finish: read their files + reports, INTEGRATE
-   (patch their work, do not rewrite from scratch), run tests IN-KERNEL
-   (`import pytest; pytest.main([...])`), fix until the tests pass.
+2. DELEGATE one child per task, in order: T1 first, then T2, then T3.
+   One delegate call per child. Sequential, never parallel.
 
-Children are LEAF workers: each child WRITES its deliverable file in the workdir
-(no stubs, no `pass`), does NOT delegate further, and reports the file path when done.
+3. APPEND to EVERY child task, VERBATIM:
+   "WRITE your deliverable to <ABS_WORKDIR>/grep.py — open('<ABS_WORKDIR>/grep.py', 'w').write(<code>) — then READ THE FILE BACK. No stubs."
 
-TASK SUFFIX (root MUST append to EVERY delegate task): "Write your deliverable to
-`grep.py` in the workdir using an ABSOLUTE path — `open('<abs workdir>/grep.py',
-'w').write(<code>)` — and READ IT BACK to verify. NEVER keep the implementation only
-in the kernel."
+4. END YOUR TURN right after delegating.
 
-NEVER modify the test file. Each child owns only its assigned task file.
+5. On re-entry: INTEGRATE the children's files (patch in place, never rewrite
+   from scratch), run pytest IN-KERNEL (import pytest; pytest.main(['grep_test.py'])),
+   fix until the tests PASS.
+
+NEVER: delegate the plan; re-delegate finished work; rlm()/spawn; parallel
+children; edit grep_test.py; keep code only in the kernel.

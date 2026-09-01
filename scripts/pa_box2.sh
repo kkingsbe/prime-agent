@@ -53,6 +53,12 @@ else
   esac
 fi
 [ -f "$PB" ] && cp "$PB" "$WD/" || { echo "[box2] protocol missing: $PB"; exit 1; }
+# inject the real workdir path into the protocol's ABS_WORKDIR placeholder so the
+# root's child-task suffix carries a concrete absolute path (children run in their
+# own session dirs; only an absolute path reaches the scored box file)
+if [ -f "$WD/PB_v3_A.md" ] && grep -q '<ABS_WORKDIR>' "$WD/PB_v3_A.md" 2>/dev/null; then
+  sed -i "s|<ABS_WORKDIR>|$WD|g" "$WD/PB_v3_A.md"
+fi
 
 # 3. follow-up components -> PA_FOLLOWUP_EXTRA
 EXTRA=""
@@ -79,6 +85,7 @@ cd "$ROOT" && timeout $((DEADLINE + 90)) python3 scripts/pa_rpc.py \
 RPC_PID=$!
 ( while kill -0 "$RPC_PID" 2>/dev/null; do
     cp "$SOLFILE" "$WD/snap-$(date +%s).py" 2>/dev/null
+    cp "$WD/PLAN.md" "$WD/snap-$(date +%s)-plan.md" 2>/dev/null
     sleep 30
   done ) &
 SNAP_PID=$!

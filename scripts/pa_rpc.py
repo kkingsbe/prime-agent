@@ -13,6 +13,7 @@ Events are dumped to <workdir>/rpc.jsonl for pa_metrics.py.
 import argparse
 import json
 import os
+import re
 import selectors
 import subprocess
 import sys
@@ -45,6 +46,18 @@ DROP_EVENT_TYPES = {
 # Child statuses that mean the child will not produce more work. "done" is a
 # natural completion; cancelled/error are teardown or provider failures.
 TERMINAL_CHILD_STATUSES = {"done", "cancelled", "error"}
+
+# Plan-first gate: design-A protocol requires >=3 numbered ##T tasks in PLAN.md
+# (in the box workdir) before any delegate call. Same regex family as pa_metrics.
+PLAN_RE = re.compile(r"^##\s*T\d+\s*[:.\-]?", re.I | re.M)
+
+
+def _plan_tasks_ok(workdir: str) -> bool:
+    try:
+        text = open(os.path.join(workdir, "PLAN.md"), encoding="utf-8").read()
+    except Exception:
+        return False
+    return len(PLAN_RE.findall(text)) >= 3
 
 
 def main():
@@ -92,9 +105,10 @@ def main():
     last_event = time.time()
     children_status: dict[str, str] = {}
     integrate_sent = False
+    plan_steer_sent = False
 
     def drain():
-        nonlocal agent_ends, followup_sent, last_event, spawned_at_turn, yielded_steered, turns, kept_lines, integrate_sent
+        nonlocal agent_ends, followup_sent, last_event, spawned_at_turn, yielded_steered, turns, kept_lines, integrate_sent, plan_steer_sent
         while True:
             r = sel.select(timeout=0.2)
             if not r:
@@ -130,6 +144,24 @@ def main():
                             if "rlm(" in code and spawned_at_turn is None:
                                 spawned_at_turn = turns
                                 print("[rpc] detected rlm() spawn; arming yield enforcement", flush=True)
+                        if (
+                            isinstance(c, dict)
+                            and c.get("type") == "toolCall"
+                            and c.get("name") == "delegate"
+                            and not plan_steer_sent
+                            and not _plan_tasks_ok(args.workdir)
+                        ):
+                            plan_steer_sent = True
+                            send({
+                                "type": "steer",
+                                "message": (
+                                    "HARD RULE: PLAN.md must contain 3 numbered tasks "
+                                    "(##T1/##T2/##T3 with | dep) BEFORE any delegate call. "
+                                    "Write PLAN.md now, then delegate."
+                                ),
+                                "id": "req-plan",
+                            })
+                            print("[rpc] steered root: write PLAN.md before delegating (plan-first gate)", flush=True)
                     sr = msg.get("stopReason")
                     if sr == "toolUse" and spawned_at_turn is not None:
                         if turns - spawned_at_turn >= 2 and not yielded_steered:
