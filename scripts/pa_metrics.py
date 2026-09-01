@@ -42,7 +42,23 @@ delegate_calls = 0             # individual delegate tool calls (root, all messa
 delegate_batches = 0           # messages containing >=1 delegate call (parallel batch)
 spec_error = False             # b10687 speculative-batch error seen in root trace
 model_404 = False              # "model downloaded but not loaded" seen in root trace
-plan_tasks = 0                 # filled externally by pa_plan.py / runner (plan file)
+# v2.1 (2026-09-01): plan_tasks wired — parse <workdir>/PLAN.md (design A fan-out gate)
+plan_tasks = 0
+try:
+    from pa_plan import parse_plan  # same scripts dir (sys.path[0]); fall back below
+except ImportError:
+    parse_plan = None
+_plan_path = os.path.join(os.path.dirname(os.path.abspath(RUN)), "PLAN.md")
+if os.path.exists(_plan_path):
+    try:
+        _plan_text = open(_plan_path, encoding="utf-8").read()
+        if parse_plan is not None:
+            plan_tasks = len(parse_plan(_plan_text)["tasks"])
+        else:
+            import re
+            plan_tasks = len(re.findall(r"^##\s*T\d+\s*[:.\-]?", _plan_text, re.I | re.M))
+    except Exception:
+        plan_tasks = 0
 
 POLL_MARKERS = ("time.sleep", "sleep(", "while True")
 VICTORY_MARKERS = ("all tests pass", "tests passed", "all pass", "complete and all tests", "passed all")
