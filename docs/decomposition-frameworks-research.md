@@ -226,7 +226,50 @@ Priority order (leverage ÷ effort): 1, 2, 3, 7, 8 first (all trivial); 9 as the
 compliance metrics; 4, 12 fold into the task/report templates; 5, 6 when width is stable; 10, 11
 when integration shows long-horizon bleed; 13 if compliance data shows drift.
 
-## 12. Sources (all verified reachable 2026-09-01)
+## 12. Adaptive self-correction — findings (2026-09-01, Kyle: "system must adapt, not patch per issue")
+
+**Principle: the adaptation loop must be driven by EXTERNAL feedback, never intrinsic
+reflection alone — for small models, intrinsic reflection is falsified.**
+
+Evidence:
+- **LLMs Cannot Self-Correct Reasoning Yet** (2310.01798): intrinsic self-correction fails
+  without external feedback; performance often DEGRADES after self-correction.
+- **CoCoS — Self-Correcting Code Gen with Small LMs** (2505.23060, EMNLP 2025): small models
+  "struggle to exhibit reflective revision behavior across both paradigms" (prompting AND
+  training-based). Fix = ONLINE RL over multi-turn correction trajectories (accumulated +
+  fine-grained rewards). → Prompt-level "reflect harder" will NOT fix LFM2.5; the durable lever
+  for the correction trajectory is training, out of scope for a frozen GGUF.
+- **Reflexion** (2303.11366): Actor + **task-specific Evaluator (external: tests/compiler)** +
+  **episodic memory buffer** of reflections guiding later attempts. We have Actor + Evaluator
+  (tester child / pytest) — the MISSING piece is persistent episodic memory.
+- **Self-Debugging** (2304.05128): rubber-duck explanation + unit-test feedback from code
+  EXECUTION locate bugs without human feedback; execution traces are the signal.
+- **NExT** (2404.14662): reason over per-line execution TRACES (variable states), not just
+  pass/fail — the evaluator upgrade path for our tester child.
+- **AdaPlanner** (2305.16653): closed-loop plan refinement from environmental feedback —
+  "adopt a refined plan instantly rather than restart" — our integration re-entry should
+  AMEND the current plan, not spawn fresh.
+- **ADAS / Meta Agent Search** (2408.08435): a meta-agent programs/evolves AGENT DESIGNS in
+  code from feedback; "hand-designed solutions are replaced by learned solutions." → Our manual
+  per-issue protocol patches are this loop by hand; institutionalize it.
+
+**Implications for our system (build order):**
+1. **Evaluator upgrade (highest leverage)**: tester child returns execution-TRACE-grade reports
+   (failing assertion values, observed-vs-expected, per-line states where possible) — NExT-style.
+   Pass/fail counts were useless to the root (it thrashed); traces give it something to adapt to.
+2. **Episodic memory (trivial, no harness change)**: `REFLECTIONS.md` in the workdir — the root
+   appends one line per failure wave ("what failed, why, what we tried"); the driver reads it
+   back into context at every re-entry. This is the missing Reflexion pillar.
+3. **Adaptive replan semantics**: driver re-entry says "AMEND the current plan (task X now:
+   …); do not spawn fresh waves" — AdaPlanner's instant-adopt.
+4. **Meta-protocol ledger (the answer to whack-a-mole)**: failures → testable protocol
+   hypothesis → A/B on the next leg (our box IS the A/B machine) → adopt/keep with a ledger
+   entry. Every past fix (suffix, contract, ast.parse) becomes an EXECUTABLE experiment, and the
+   meta-loop — not us — decides what the protocol looks like next leg.
+5. **HARD RULE**: never ship an "intrinsic reflection" fix as the primary adaptation for LFM2.5
+   (falsified by 2310.01798 + CoCoS). Reflection only as the glue between external signals.
+
+## 13. Sources (all verified reachable 2026-09-01)
 - ReAct 2210.03629 · Plan-and-Solve 2305.04091 · Least-to-Most 2205.10625 · ToT 2305.10601 ·
   GoT 2308.09687 · LATS 2310.04406 · Reflexion 2303.11366 · Self-Refine 2303.17651 ·
   As-Needed Decomp 2311.05772 · LLM+P 2304.11477 · TaskBench 2311.18760 ·
