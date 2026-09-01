@@ -75,7 +75,7 @@ esac
 
 if [ "$NEXT" != "TR-00" ]; then
   DST=$(ls -dt "$ARCH"/*-"${NEXT#TR-}" 2>/dev/null | head -1)
-  [ -z "$DST" ] && DST=$(ls -dt "$ARCH"/*-* 2>/dev/null | head -1)
+  [ -z "$DST" ] && DST=$(find "$ARCH" -mindepth 1 -maxdepth 1 -type d -name "*-*" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
   if [ -d "$DST" ]; then
     SCORE=$(head -1 "$DST/score.txt" 2>/dev/null)
     METRICS=$(grep -E "delegates|spawns|child_terminal|child_aborted|clean_exit|error_flags|plan_tasks" "$DST/metrics.txt" 2>/dev/null | tr '\n' '; ')
