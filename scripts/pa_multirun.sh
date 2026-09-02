@@ -9,7 +9,7 @@ LOG="$ROOT/run-archive/multiQ.log"
 mkdir -p "$ROOT/run-archive"
 echo "== multirun @ $(date -u +%H:%M:%SZ) ==" >> "$LOG"
 for spec in "$@"; do
-  while IFS='|' read -r EX RUN FLAGS; do
+  while IFS='|' read -r EX RUN FLAGS || [ -n "$EX" ]; do
     [ -z "$EX" ] && continue
     echo "=== $EX [$RUN] @ $(date -u +%H:%M:%SZ) ===" >> "$LOG"
     timeout 1700 bash "$ROOT/scripts/pa_box2.sh" --ex "$EX" --run "$RUN" $FLAGS >> "$LOG" 2>&1 \
