@@ -218,14 +218,15 @@ def main():
                     # Delegation path: never conclude while children are still active.
                     if all(s in TERMINAL_CHILD_STATUSES for s in children_status.values()):
                         print("[rpc] final agent_end — all children terminal; done", flush=True)
-                        return True
+                        if args.loop == 0:
+                            return True
                     print(
                         f"[rpc] agent_end #{agent_ends} but children active "
                         f"({dict(children_status)}); waiting for child-done re-entry",
                         flush=True,
                     )
                 else:
-                    if agent_ends == 1 and not followup_sent:
+                    if agent_ends == 1 and not followup_sent and args.loop == 0:
                         followup_sent = True
                         send({
                             "type": "follow_up",
@@ -239,7 +240,8 @@ def main():
                         print("[rpc] sent integration follow_up (single)", flush=True)
                     elif agent_ends >= 2:
                         print("[rpc] final agent_end — done", flush=True)
-                        return True
+                        if args.loop == 0:
+                            return True
             elif et == "rlm_child_update":
                 c = ev.get("child", {})
                 cid = c.get("id")
