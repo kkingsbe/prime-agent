@@ -97,6 +97,8 @@ def main():
     ap.add_argument("--model", default="bartowski/Ling-3.0-tiny-GGUF")
     ap.add_argument("--prompt", required=True)
     ap.add_argument("--deadline", type=int, default=900)
+    ap.add_argument("--loop", type=int, default=0, help="feedback loop cycles (0=off)")
+    ap.add_argument("--cycle-sec", type=int, default=250, help="per-cycle budget inside the deadline")
     args = ap.parse_args()
 
     env = dict(os.environ)
@@ -280,8 +282,40 @@ def main():
         return False
 
     done = False
+    loop_cycles = 0
+    seen_ends = 0
+    cycle_deadline = time.time() + args.cycle_sec
     while time.time() < deadline and not done:
         done = drain()
+        # feedback loop (arm-independent driver feature): on each clean re-entry
+        # boundary — new agent_end with all children terminal, or cycle-budget
+        # expiry — run pytest, inject failing names + detail, force re-entry.
+        if args.loop > 0 and not done:
+            now = time.time()
+            children_done = True
+            if children_status and not all(s in TERMINAL_CHILD_STATUSES for s in children_status.values()):
+                children_done = False
+            fired = False
+            if agent_ends > seen_ends and children_done:
+                seen_ends = agent_ends
+                fired = True
+            elif now >= cycle_deadline and agent_ends > 0 and children_done and loop_cycles < args.loop:
+                fired = True  # budget expiry: force a checkpoint re-entry
+            if fired and loop_cycles < args.loop:
+                loop_cycles += 1
+                eval_src = os.environ.get("PA_EVAL_TEST", "").strip()
+                fb = _eval_feedback(args.workdir, eval_src) if eval_src else "(no PA_EVAL_TEST set)"
+                base = (
+                    f"CYCLE {loop_cycles}/{args.loop}: the tests still fail as reported below. "
+                    f"Fix the failing tests now. You have until the deadline.\n\n{fb}"
+                )
+                extra = os.environ.get("PA_FOLLOWUP_EXTRA", "").strip()
+                if extra:
+                    base += "\n\n" + extra
+                send({"type": "follow_up", "message": base, "id": f"req-cycle-{loop_cycles}"})
+                cycle_deadline = now + args.cycle_sec
+                print(f"[rpc] loop cycle {loop_cycles}/{args.loop} fired "
+                      f"(ends={agent_ends} children={children_done})", flush=True)
         # NO repeated nudges: a single follow_up above is the only re-entry.
         # If the process goes quiet, we just wait; the deadline bounds the run.
     if not done:

@@ -19,4 +19,9 @@ argparse, no sys.argv, no stdin reads."
 5. MEMORY: append ONE line to REFLECTIONS.md per failed attempt: "what failed / why / what
    you changed". Re-read before each new attempt.
 
+6. FEEDBACK LOOP (on every re-entry when tests still fail): fix IN PLACE yourself —
+   read the failing test names + expected-vs-actual in the feedback, patch the file with
+   ipython edits, re-run the tests in-kernel. Keep editing until they pass or the cycle
+   budget runs out.
+
 NEVER: delegate; rlm()/spawn; edit <SLUG>_test.py; keep code only in the kernel.

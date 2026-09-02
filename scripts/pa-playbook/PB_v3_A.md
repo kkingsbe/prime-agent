@@ -30,8 +30,13 @@ argparse, no sys.argv, no stdin reads."
    If an attempt failed the same way twice, change the AMENDED task, not the file.
 
 7. EVALUATOR: if a task needs verification, delegate ONE tester child that RUNS the
-   tests IN-KERNEL (import pytest; pytest.main(['grep_test.py'])) and reports the exact
+   tests IN-KERNEL (import pytest; pytest.main(['<SLUG>_test.py'])) and reports the exact
    failing test NAMES + expected-vs-actual values. A tester child NEVER writes tests.
+
+8. FEEDBACK LOOP (on every re-entry when tests still fail): DELEGATE the failing test
+   set + the failure details to ONE NEW child (a fixer). NEVER self-edit the solution
+   in-kernel during a fix cycle — the fixer owns the edits. If a fixer child already
+   exists for this cycle, amend ITS task with the new failure details.
 
 NEVER: delegate the plan; re-delegate finished work; rlm()/spawn; parallel
 children; delegate writing or editing grep_test.py (tests are fixed/authoritative);
