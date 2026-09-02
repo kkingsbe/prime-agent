@@ -97,7 +97,7 @@ export PA_FOLLOWUP_EXTRA="$EXTRA"
 
 # 4. run (foreground; deadline+buffer) with periodic solution-file snapshots
 echo "[box2] following entries -> $WD/run.log"
-cd "$ROOT" && timeout $((DEADLINE + LOOP * CYCLESEC + 90)) python3 scripts/pa_rpc.py \
+cd "$ROOT" && timeout $((DEADLINE + LOOP * CYCLESEC + 180)) python3 scripts/pa_rpc.py \
   --workdir "$WD" --model LiquidAI/LFM2.5-2.6B-GGUF --prompt "$PROMPT" \
   --deadline "$DEADLINE" --loop "$LOOP" --cycle-sec "$CYCLESEC" > "$WD/run.log" 2>&1 &
 RPC_PID=$!
