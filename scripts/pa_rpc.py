@@ -107,6 +107,25 @@ def main():
 
     evfile = os.path.join(args.workdir, "rpc.jsonl")
     evf = open(evfile, "w")
+    usage_file = os.path.join(args.workdir, "usage.jsonl")
+    uf = open(usage_file, "w")
+    peak_prompt = 0
+    peak_completion = 0
+
+    def scoop_usage(ev):
+        """Dig any usage dict out of the event tree (provider usage can ride on
+        message_update deltas or message_end). Returns list of dicts."""
+        hits = []
+        stack = [ev]
+        while stack:
+            o = stack.pop()
+            if isinstance(o, dict):
+                if isinstance(o.get("usage"), dict) and ("prompt_tokens" in o["usage"] or "completion_tokens" in o["usage"]):
+                    hits.append(o["usage"])
+                stack.extend(o.values())
+            elif isinstance(o, list):
+                stack.extend(o)
+        return hits
     dropped_by_type: dict[str, int] = {}
     kept_lines = 0
 
@@ -145,7 +164,7 @@ def main():
     turn_ends = 0
 
     def drain():
-        nonlocal agent_ends, followup_sent, last_event, spawned_at_turn, yielded_steered, turns, kept_lines, integrate_sent, plan_steer_sent, turn_ends
+        nonlocal agent_ends, followup_sent, last_event, spawned_at_turn, yielded_steered, turns, kept_lines, integrate_sent, plan_steer_sent, turn_ends, peak_prompt, peak_completion
         while True:
             r = sel.select(timeout=0.2)
             if not r:
@@ -162,6 +181,17 @@ def main():
             except Exception:
                 continue
             et = ev.get("type")
+            try:
+                for u in scoop_usage(ev):
+                    pt = u.get("prompt_tokens") or 0
+                    ct = u.get("completion_tokens") or 0
+                    peak_prompt = max(peak_prompt, pt)
+                    peak_completion = max(peak_completion, ct)
+                    uf.write(json.dumps({"type": et, "prompt": pt, "completion": ct,
+                                         "total": u.get("total_tokens", pt + ct)}) + "\n")
+                    uf.flush()
+            except Exception:
+                pass
             if et in DROP_EVENT_TYPES:
                 dropped_by_type[et] = dropped_by_type.get(et, 0) + 1
                 continue
@@ -326,6 +356,7 @@ def main():
                       f"(ends={agent_ends} children={children_done})", flush=True)
         # NO repeated nudges: a single follow_up above is the only re-entry.
         # If the process goes quiet, we just wait; the deadline bounds the run.
+    print(f"[rpc] usage peak: prompt={peak_prompt} completion={peak_completion} -> {usage_file}", flush=True)
     if not done:
         print(f"[rpc] deadline exceeded ({args.deadline}s + {args.loop}x{args.cycle_sec}s loop); aborting", flush=True)
         try:
