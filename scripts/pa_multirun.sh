@@ -12,7 +12,7 @@ for spec in "$@"; do
   while IFS='|' read -r EX RUN FLAGS || [ -n "$EX" ]; do
     [ -z "$EX" ] && continue
     echo "=== $EX [$RUN] @ $(date -u +%H:%M:%SZ) ===" >> "$LOG"
-    timeout 1700 bash "$ROOT/scripts/pa_box2.sh" --ex "$EX" --run "$RUN" $FLAGS >> "$LOG" 2>&1 \
+    timeout 2300 bash "$ROOT/scripts/pa_box2.sh" --ex "$EX" --run "$RUN" $FLAGS >> "$LOG" 2>&1 \
       || echo "rc=$? ($EX)" >> "$LOG"
     echo "=== $EX [$RUN] done @ $(date -u +%H:%M:%SZ) ===" >> "$LOG"
   done < "$spec"
