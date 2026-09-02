@@ -360,6 +360,11 @@ def main():
         # NO repeated nudges: a single follow_up above is the only re-entry.
         # If the process goes quiet, we just wait; the deadline bounds the run.
     try:
+        import time as _t
+        _t.sleep(90)  # monitor populates token fields with a delay after request end
+    except Exception:
+        pass
+    try:
         import urllib.request
         req = urllib.request.Request(
             "http://192.168.68.58:8888/api/inference/monitor",
