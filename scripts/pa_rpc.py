@@ -45,7 +45,7 @@ DROP_EVENT_TYPES = {
 
 # Child statuses that mean the child will not produce more work. "done" is a
 # natural completion; cancelled/error are teardown or provider failures.
-TERMINAL_CHILD_STATUSES = {"done", "cancelled", "error"}
+TERMINAL_CHILD_STATUSES = {"done", "cancelled", "error", "aborted", "stopped"}
 
 # Plan-first gate: design-A protocol requires >=3 numbered ##T tasks in PLAN.md
 # (in the box workdir) before any delegate call. Same regex family as pa_metrics.
@@ -139,9 +139,10 @@ def main():
     children_status: dict[str, str] = {}
     integrate_sent = False
     plan_steer_sent = False
+    turn_ends = 0
 
     def drain():
-        nonlocal agent_ends, followup_sent, last_event, spawned_at_turn, yielded_steered, turns, kept_lines, integrate_sent, plan_steer_sent
+        nonlocal agent_ends, followup_sent, last_event, spawned_at_turn, yielded_steered, turns, kept_lines, integrate_sent, plan_steer_sent, turn_ends
         while True:
             r = sel.select(timeout=0.2)
             if not r:
@@ -210,6 +211,8 @@ def main():
                             })
                             print("[rpc] steered root to yield (2+ tool turns after spawn)", flush=True)
             elif et == "turn_end":
+                turn_ends += 1
+                print(f"[rpc] turn_end #{turn_ends} at {time.time():.0f}", flush=True)
                 pass
             if et == "agent_end":
                 agent_ends += 1
@@ -285,23 +288,24 @@ def main():
 
     done = False
     loop_cycles = 0
-    seen_ends = 0
+    seen_turns = 0
     cycle_deadline = time.time() + args.cycle_sec
     while time.time() < deadline and not done:
         done = drain()
         # feedback loop (arm-independent driver feature): on each clean re-entry
-        # boundary — new agent_end with all children terminal, or cycle-budget
-        # expiry — run pytest, inject failing names + detail, force re-entry.
+        # boundary — a completed turn (turn_end) with all children terminal, or
+        # cycle-budget expiry — run pytest, inject failing names + detail, force
+        # re-entry. NOTE: the RPC stream emits turn_end, NOT agent_end.
         if args.loop > 0 and not done:
             now = time.time()
             children_done = True
             if children_status and not all(s in TERMINAL_CHILD_STATUSES for s in children_status.values()):
                 children_done = False
             fired = False
-            if agent_ends > seen_ends and children_done:
-                seen_ends = agent_ends
+            if turn_ends > seen_turns and children_done:
+                seen_turns = turn_ends
                 fired = True
-            elif now >= cycle_deadline and agent_ends > 0 and children_done and loop_cycles < args.loop:
+            elif now >= cycle_deadline and turn_ends > 0 and children_done and loop_cycles < args.loop:
                 fired = True  # budget expiry: force a checkpoint re-entry
             if fired and loop_cycles < args.loop:
                 loop_cycles += 1
