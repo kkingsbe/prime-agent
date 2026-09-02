@@ -130,6 +130,9 @@ def main():
     send({"type": "prompt", "message": args.prompt, "id": "req-1"})
 
     deadline = time.time() + args.deadline
+    # additive loop budget: total = solve window + cycles*cycle_sec (both arms identical);
+    # a cycle can NEVER fire inside the initial solve window.
+    total_deadline = time.time() + args.deadline + args.loop * args.cycle_sec
     agent_ends = 0
     followup_sent = False
     yielded_steered = False
@@ -289,24 +292,23 @@ def main():
     done = False
     loop_cycles = 0
     seen_turns = 0
-    cycle_deadline = time.time() + args.cycle_sec
-    while time.time() < deadline and not done:
+    cycle_deadline = deadline + args.cycle_sec  # first cycle fires only AFTER the solve window
+    while time.time() < total_deadline and not done:
         done = drain()
-        # feedback loop (arm-independent driver feature): on each clean re-entry
-        # boundary — a completed turn (turn_end) with all children terminal, or
-        # cycle-budget expiry — run pytest, inject failing names + detail, force
-        # re-entry. NOTE: the RPC stream emits turn_end, NOT agent_end.
+        # feedback loop (arm-independent driver feature): cycles begin only after the
+        # solve window (args.deadline) has elapsed; each cycle gets args.cycle_sec.
+        # NOTE: the RPC stream emits turn_end, NOT agent_end.
         if args.loop > 0 and not done:
             now = time.time()
             children_done = True
             if children_status and not all(s in TERMINAL_CHILD_STATUSES for s in children_status.values()):
                 children_done = False
             fired = False
-            if turn_ends > seen_turns and children_done:
+            if now >= deadline and turn_ends > seen_turns and children_done:
                 seen_turns = turn_ends
                 fired = True
             elif now >= cycle_deadline and turn_ends > 0 and children_done and loop_cycles < args.loop:
-                fired = True  # budget expiry: force a checkpoint re-entry
+                fired = True  # cycle budget expiry: force a checkpoint re-entry
             if fired and loop_cycles < args.loop:
                 loop_cycles += 1
                 eval_src = os.environ.get("PA_EVAL_TEST", "").strip()
@@ -325,7 +327,7 @@ def main():
         # NO repeated nudges: a single follow_up above is the only re-entry.
         # If the process goes quiet, we just wait; the deadline bounds the run.
     if not done:
-        print(f"[rpc] deadline exceeded ({args.deadline}s); aborting", flush=True)
+        print(f"[rpc] deadline exceeded ({args.deadline}s + {args.loop}x{args.cycle_sec}s loop); aborting", flush=True)
         try:
             send({"type": "abort", "id": "req-9"})
         except Exception:
