@@ -120,7 +120,10 @@ def main():
         while stack:
             o = stack.pop()
             if isinstance(o, dict):
-                if isinstance(o.get("usage"), dict) and ("prompt_tokens" in o["usage"] or "completion_tokens" in o["usage"]):
+                if isinstance(o.get("usage"), dict) and (
+                    "prompt_tokens" in o["usage"] or "completion_tokens" in o["usage"]
+                    or "input" in o["usage"] or "output" in o["usage"] or "totalTokens" in o["usage"]
+                ):
                     hits.append(o["usage"])
                 stack.extend(o.values())
             elif isinstance(o, list):
@@ -356,6 +359,25 @@ def main():
                       f"(ends={agent_ends} children={children_done})", flush=True)
         # NO repeated nudges: a single follow_up above is the only re-entry.
         # If the process goes quiet, we just wait; the deadline bounds the run.
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            "http://192.168.68.58:8888/api/inference/monitor",
+            headers={"Authorization": "Bearer " + env["RIG_API_KEY"]},
+        )
+        mon = json.load(urllib.request.urlopen(req, timeout=10))
+        sess_start = time.time() - (args.deadline + args.loop * args.cycle_sec + 120)
+        for e in mon.get("entries", []):
+            if (e.get("started_at") or 0) >= sess_start and e.get("prompt_tokens"):
+                uf.write(json.dumps({"type": "monitor", "prompt": e.get("prompt_tokens"),
+                                     "completion": e.get("completion_tokens"),
+                                     "total": e.get("total_tokens", 0),
+                                     "context_usage": e.get("context_usage")}) + "\n")
+                peak_prompt = max(peak_prompt, e.get("prompt_tokens") or 0)
+                peak_completion = max(peak_completion, e.get("completion_tokens") or 0)
+        uf.flush()
+    except Exception as ex:
+        print(f"[rpc] monitor sweep failed: {ex}", flush=True)
     print(f"[rpc] usage peak: prompt={peak_prompt} completion={peak_completion} -> {usage_file}", flush=True)
     if not done:
         print(f"[rpc] deadline exceeded ({args.deadline}s + {args.loop}x{args.cycle_sec}s loop); aborting", flush=True)
