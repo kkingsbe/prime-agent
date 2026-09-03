@@ -67,9 +67,13 @@ def main():
                     methods.add(f"{base}.{node.func.attr}({len(node.args)} args)")
         elif isinstance(node, ast.Attribute):
             # PhoneNumber("...").number — property access on a constructed instance
-            base = safe_name(node.value.func) if isinstance(node.value, ast.Call) else None
-            if base in imported_names:
-                methods.add(f"{base}.{node.attr} (property)")
+            # InputCell(5).value (chained) or inp.value (assigned instance)
+            if isinstance(node.value, ast.Call):
+                base = safe_name(node.value.func)
+                if base in imported_names:
+                    methods.add(f"{base}.{node.attr} (property)")
+            elif isinstance(node.value, ast.Name) and node.value.id in instances:
+                methods.add(f"{instances[node.value.id]}.{node.attr} (property)")
         elif isinstance(node, ast.ClassDef):
             if not node.name.endswith("Test"):  # skip the pytest class itself
                 instantiations.append(node.name)

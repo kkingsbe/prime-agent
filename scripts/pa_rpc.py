@@ -99,6 +99,7 @@ def main():
     ap.add_argument("--deadline", type=int, default=900)
     ap.add_argument("--loop", type=int, default=0, help="feedback loop cycles (0=off)")
     ap.add_argument("--cycle-sec", type=int, default=250, help="per-cycle budget inside the deadline")
+    ap.add_argument("--guard", type=int, default=0, help="loop regression guard (0=off)")
     args = ap.parse_args()
 
     env = dict(os.environ)
@@ -109,6 +110,8 @@ def main():
     evf = open(evfile, "w")
     usage_file = os.path.join(args.workdir, "usage.jsonl")
     uf = open(usage_file, "w")
+    gf = open(os.path.join(args.workdir, "regressions.jsonl"), "w")
+    _guard_fails = None
     peak_prompt = 0
     peak_completion = 0
 
@@ -346,6 +349,20 @@ def main():
                 loop_cycles += 1
                 eval_src = os.environ.get("PA_EVAL_TEST", "").strip()
                 fb = _eval_feedback(args.workdir, eval_src) if eval_src else "(no PA_EVAL_TEST set)"
+                # loop guard (R5.5, default OFF): flag cycles where the failing count
+                # rises vs the previous cycle — instrumentation only, no revert.
+                if args.guard:
+                    import re as _re
+                    gm = _re.search(r"PYTEST FEEDBACK \((\d+) failing", fb)
+                    if gm:
+                        n = int(gm.group(1))
+                        if _guard_fails is not None and n > _guard_fails:
+                            gf.write(json.dumps({"cycle": loop_cycles, "fails": n,
+                                                 "prev_fails": _guard_fails}) + "\n")
+                            gf.flush()
+                            print(f"[rpc] LOOP GUARD: cycle {loop_cycles} regression "
+                                  f"{_guard_fails} -> {n} (recorded, no revert)", flush=True)
+                        _guard_fails = n
                 base = (
                     f"CYCLE {loop_cycles}/{args.loop}: the tests still fail as reported below. "
                     f"Fix the failing tests now. You have until the deadline.\n\n{fb}"

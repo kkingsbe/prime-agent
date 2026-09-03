@@ -13,13 +13,13 @@ SCORER=/opt/data/repos/aider/.venv-bench/bin/python
 ARCHIVE="$ROOT/run-archive"
 mkdir -p "$ARCHIVE" /tmp/pa-box2
 
-EX=""; RUN=""; DESIGN="ctrl"; DEADLINE=1200; COMPS=""; SOLO=0; CONTRACT=0; EVAL=0; LOOP=0; CYCLESEC=250
+EX=""; RUN=""; DESIGN="ctrl"; DEADLINE=1200; COMPS=""; SOLO=0; CONTRACT=0; EVAL=0; LOOP=0; CYCLESEC=250; SLOTS=4
 while [ $# -gt 0 ]; do
   case "$1" in
     --ex) EX="$2"; shift 2;; --run) RUN="$2"; shift 2;; --design) DESIGN="$2"; shift 2;;
     --deadline) DEADLINE="$2"; shift 2;; --components) COMPS="$2"; shift 2;;
     --solo) SOLO=1; shift;; --contract) CONTRACT=1; shift;; --eval) EVAL=1; shift;;
-    --loop) LOOP="$2"; shift 2;; --cycle-sec) CYCLESEC="$2"; shift 2;;
+    --loop) LOOP="$2"; shift 2;; --cycle-sec) CYCLESEC="$2"; shift 2;; --slots) SLOTS="$2"; shift 2;;
     *) echo "unknown: $1"; exit 2;;
   esac
 done
@@ -28,6 +28,10 @@ SRC="$POLY/$EX"; [ -d "$SRC" ] || { echo "no exercise $SRC"; exit 1; }
 SLUG=$(echo "$EX" | tr - _)   # dir name -> module file slug (phone-number -> phone_number)
 
 # 0. rig assert (fail fast)
+# 0. rig: assert champion (fail fast); --slots N reloads with PARALLEL=N + asserts slot size
+if [ "$SLOTS" -ne 4 ]; then
+  PARALLEL="$SLOTS" bash "$ROOT/scripts/pa_rigctl.sh" load && sleep 3
+fi
 bash "$ROOT/scripts/pa_rigctl.sh" assert || { echo "[box2] RIG ASSERT FAILED — aborting"; exit 3; }
 echo "[box2] $RUN | ex=$EX design=$DESIGN deadline=${DEADLINE}s comps=[$COMPS] solo=$SOLO | $(date -u +%H:%M:%SZ)"
 
@@ -107,7 +111,12 @@ RPC_PID=$!
     sleep 30
   done ) &
 SNAP_PID=$!
-wait "$RPC_PID"; RC=$?
+wait "$RPC_PID"
+# restore 4-slot config after a 1-slot leg (R5.4 resource-matched solos)
+if [ "$SLOTS" -ne 4 ]; then
+  bash "$ROOT/scripts/pa_rigctl.sh" load && sleep 2
+  PARALLEL=4 bash "$ROOT/scripts/pa_rigctl.sh" assert || echo "[box2] WARN: restore-to-4 assert failed"
+fi; RC=$?
 kill "$SNAP_PID" 2>/dev/null
 cp "$SOLFILE" "$WD/snap-$(date +%s)-final.py" 2>/dev/null
 grep --line-buffered -E "\[rpc\]" "$WD/run.log" | tail -25
