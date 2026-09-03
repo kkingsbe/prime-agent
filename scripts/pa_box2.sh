@@ -31,8 +31,10 @@ SLUG=$(echo "$EX" | tr - _)   # dir name -> module file slug (phone-number -> ph
 # 0. rig: assert champion (fail fast); --slots N reloads with PARALLEL=N + asserts slot size
 if [ "$SLOTS" -ne 4 ]; then
   PARALLEL="$SLOTS" bash "$ROOT/scripts/pa_rigctl.sh" load && sleep 3
+  PARALLEL="$SLOTS" bash "$ROOT/scripts/pa_rigctl.sh" assert || { echo "[box2] RIG ASSERT FAILED (slots $SLOTS) — aborting"; exit 3; }
+else
+  bash "$ROOT/scripts/pa_rigctl.sh" assert || { echo "[box2] RIG ASSERT FAILED — aborting"; exit 3; }
 fi
-bash "$ROOT/scripts/pa_rigctl.sh" assert || { echo "[box2] RIG ASSERT FAILED — aborting"; exit 3; }
 echo "[box2] $RUN | ex=$EX design=$DESIGN deadline=${DEADLINE}s comps=[$COMPS] solo=$SOLO | $(date -u +%H:%M:%SZ)"
 
 # 1. workdir from PRISTINE source
